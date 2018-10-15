@@ -30,7 +30,7 @@ public class DataSourceAspect {
     //增加api 控制器切入点，是因为动态数据源切换需要在事务开启前执行，故需要在service前切换
     //@within在类上设置
     //@annotation在方法上进行设置
-    @Pointcut("@within(com.example.database.datasource.TargetDataSource) || @annotation(com.example.database.datasource.TargetDataSource)")
+    @Pointcut("@within(com.example.database.datasource.TargetDataSource) || @annotation(com.example.database.datasource.TargetDataSource) || execution (* com.example.database.service.*.*(..))")
     public void dataSourcePointCut() {}
 
     /**
@@ -38,8 +38,7 @@ public class DataSourceAspect {
      * @param joinPoint
      */
     @Before("dataSourcePointCut()")
-    public void doBefore(JoinPoint joinPoint)
-    {
+    public void doBefore(JoinPoint joinPoint) {
         Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
         TargetDataSource annotationClass = method.getAnnotation(TargetDataSource.class); //获取方法上的注解
         if (annotationClass == null) {

@@ -8,7 +8,9 @@ import com.example.database.repository.AttachmentUploadingRecordRepository;
 import com.example.database.service.AttachmentUploadingRecordService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedList;
@@ -32,8 +34,11 @@ public class AttachmentUploadingRecordServiceImpl implements AttachmentUploading
 
     @Autowired
     private AttachmentUploadingRecordRepository attachmentUploadingRecordRepository;
+    @Autowired
+    private ApplicationContext applicationContext;
 
-    @Transactional
+   // @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TargetDataSource(dataSource = DataSourceType.MASTER)
     @Override
     public Long insert(AttachmentUploadingRecord record) {
         Long fileId = 0L;
@@ -44,6 +49,7 @@ public class AttachmentUploadingRecordServiceImpl implements AttachmentUploading
             log.error("上传文件数据入库出现异常.");
             e.printStackTrace();
         }
+        log.info("新增数据返回id:" + fileId);
         return fileId;
 
     }
@@ -74,25 +80,33 @@ public class AttachmentUploadingRecordServiceImpl implements AttachmentUploading
         return result;
     }
 
-    //@Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class)
     @TargetDataSource(dataSource = DataSourceType.SLAVE)
     @Override
-    public int delete(Long id) {
+    public int delete(Long id) throws Exception {
         try {
-             attachmentUploadingRecordRepository.deleteById(id);
-             this.findByAttachmentType((byte) 1);
+            attachmentUploadingRecordRepository.deleteById(id);
             AttachmentUploadingRecord record = new AttachmentUploadingRecord();
             Random random = new Random(1000);
             int number = random.nextInt();
-            record.setAttachmentName("20180828170511301217357554666142018082817051130121735755466614201808281705113012173575546661420180828170511301217357554666142018082817051130121735755466614201808281705113012173575546661420180828170511301217357554666142018082817051130121735755466614201808281705113012173575546661420180828170511301217357554666142018082817051130121735755466614201808281705113012173575546661420180828170511301217357554666142018082817051130121735755466614201808281705113012173575546661420180828170511301217357554666142018082817051130121735755466614201808281705113012173575546661420180828170511301217357554666142018082817051130121735755466614201808281705113012173575546661420180828170511301217357554666142018082817051130121735755466614" + number + ".docx");
+            record.setAttachmentName("20180828170511301217614" + number + ".docx");
             record.setAttachmentPostfix(".docx");
             record.setAttachmentOriginalName("关于提报半年工作总结的通知-" + number + ".docx");
-            this.update(record);
+            //this.insert(record); // 内嵌方法 这种方式直接调用无法触发AOP 切换数据源
+
+            //使用下面方式才能在内嵌方法中触发AOP 切换数据源
+            AttachmentUploadingRecordService serviceTemp = applicationContext.getBean(AttachmentUploadingRecordServiceImpl.class);
+            serviceTemp.insert(record); //正确的切换到 insert（）上配置的数据源
+
+
+           // int i = 1 / 0;
+
             return  1;
         } catch (Exception e){
             e.printStackTrace();
             log.error("删除出现异常.");
-            return 0;
+            throw new Exception("抛异常了");
+
         }
     }
 

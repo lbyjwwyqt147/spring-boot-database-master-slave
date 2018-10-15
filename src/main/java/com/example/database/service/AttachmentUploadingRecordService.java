@@ -44,7 +44,7 @@ public interface AttachmentUploadingRecordService {
      * @param id
      * @return
      */
-    int delete(Long id);
+    int delete(Long id) throws Exception;
 
     /**
      * 根据ID 获取数据

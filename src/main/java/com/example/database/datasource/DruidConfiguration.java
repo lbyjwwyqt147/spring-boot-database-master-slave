@@ -1,26 +1,37 @@
 package com.example.database.datasource;
 
-import com.alibaba.druid.pool.DruidDataSource;
+import com.alibaba.druid.pool.xa.DruidXADataSource;
 import com.alibaba.druid.support.http.StatViewServlet;
 import com.alibaba.druid.support.http.WebStatFilter;
+import com.atomikos.icatch.jta.UserTransactionImp;
+import com.atomikos.icatch.jta.UserTransactionManager;
+import com.atomikos.jdbc.nonxa.AtomikosNonXADataSourceBean;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.jta.atomikos.AtomikosDataSourceBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Primary;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.core.env.Environment;
+import org.springframework.orm.jpa.JpaVendorAdapter;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.vendor.Database;
+import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.jta.JtaTransactionManager;
 
-import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
+import javax.transaction.TransactionManager;
+import javax.transaction.UserTransaction;
 import java.sql.SQLException;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 /***
@@ -119,6 +130,7 @@ public class DruidConfiguration {
         private String slaveTwoPassword;
 
         private String driverClassName;
+        private String type;
         private Integer initialSize;
         private Integer minIdle;
         private Integer maxActive;
@@ -134,15 +146,18 @@ public class DruidConfiguration {
         private String filters;
         private String connectionProperties;
         private Boolean useGlobalDataSourceStat;
+        private Integer poolSize;
+        private Integer transactionTimeout;
+
 
         /**
          * 　声明主库 Bean实例
          *
          * @return
          */
-        @Bean(value = "masterDataSource", destroyMethod = "close")
+        @Bean(value = "masterDataSource", initMethod = "init",  destroyMethod = "close")
         public DataSource masterDataSource() {
-            return getDataSource(masterUrl, masterUsername, masterPassword);
+            return getDataSource(masterUrl, masterUsername, masterPassword, "masterDataSource");
         }
 
         /**
@@ -150,9 +165,9 @@ public class DruidConfiguration {
          *
          * @return
          */
-        @Bean(value = "slaveOneDataSource", destroyMethod = "close")
+        @Bean(value = "slaveOneDataSource",  initMethod = "init",  destroyMethod = "close")
         public DataSource slaveOneDataSource() {
-            return getDataSource(slaveOneUrl, slaveOneUsername, slaveOnePassword);
+            return getDataSource(slaveOneUrl, slaveOneUsername, slaveOnePassword, "slaveOneDataSource");
         }
 
         /**
@@ -160,9 +175,9 @@ public class DruidConfiguration {
          *
          * @return
          */
-        @Bean(value = "slaveTwoDataSource", destroyMethod = "close")
+        @Bean(value = "slaveTwoDataSource",  initMethod = "init",  destroyMethod = "close")
         public DataSource slaveTwoDataSource() {
-            return getDataSource(slaveTwoUrl, slaveTwoUsername, slaveTwoPassword);
+            return getDataSource(slaveTwoUrl, slaveTwoUsername, slaveTwoPassword, "slaveTwoDataSource");
         }
 
         /**
@@ -185,7 +200,7 @@ public class DruidConfiguration {
          */
         @Bean(name = "dataSource")
         @Primary
-        public MultipleDataSourceRouting dataSource() throws SQLException{
+        public MultipleDataSourceRouting dataSource() throws Throwable{
             //按照目标数据源名称和目标数据源对象的映射存放在Map中
             Map<String, DataSource> targetDataSources = new ConcurrentHashMap<>();
             targetDataSources.put(DataSourceType.MASTER, masterDataSource());
@@ -197,18 +212,82 @@ public class DruidConfiguration {
         }
 
 
+      //  @DependsOn({ "atomikosUserTransaction", "atomikosTransactionManager" })
+        @Bean
+        public LocalContainerEntityManagerFactoryBean entityManagerFactory() throws Throwable {
+            LocalContainerEntityManagerFactoryBean entityManager = new LocalContainerEntityManagerFactoryBean();
+            //entityManager.setDataSource(dataSource());
+            entityManager.setDataSource(masterDataSource());
+            entityManager.setJpaVendorAdapter(jpaVendorAdapter());
+            entityManager.setPackagesToScan("com.example.database.entity");
+            entityManager.setPersistenceUnitName("jpa");
+            Properties properties = new Properties();
+            //jta设置
+            properties.put("hibernate.current_session_context_class", "jta");
+            properties.put("hibernate.transaction.factory_class", "org.hibernate.transaction.JTATransactionFactory");
+            properties.put("hibernate.transaction.manager_lookup_class", "com.atomikos.icatch.jta.hibernate3.TransactionManagerLookup");
+            entityManager.setJpaProperties(properties);
+            return entityManager;
+        }
+
+        @Bean
+        public JpaVendorAdapter jpaVendorAdapter() {
+            HibernateJpaVendorAdapter hibernateJpaVendorAdapter = new HibernateJpaVendorAdapter();
+            hibernateJpaVendorAdapter.setShowSql(true);
+            hibernateJpaVendorAdapter.setGenerateDdl(true);
+            hibernateJpaVendorAdapter.setDatabase(Database.MYSQL);
+            return hibernateJpaVendorAdapter;
+        }
+
+        @Bean(name = "atomikosUserTransaction")
+        public UserTransaction atomikosUserTransaction() throws Throwable {
+            UserTransactionImp userTransactionImp = new UserTransactionImp();
+            userTransactionImp.setTransactionTimeout(transactionTimeout);
+            return userTransactionImp;
+        }
+
         /**
-         * 　DataSource　事物
+         *  atomikos事务管理
+         * @return
+         * @throws Throwable
+         */
+        @Bean(name = "atomikosTransactionManager", initMethod = "init", destroyMethod = "close")
+        public UserTransactionManager atomikosTransactionManager() throws Throwable {
+            UserTransactionManager userTransactionManager = new UserTransactionManager();
+            userTransactionManager.setForceShutdown(false);
+            return userTransactionManager;
+        }
+
+        /**
+         *  JTA 分布式事物　　适用于多个数据源事物管理
+         * @return
+         * @throws Throwable
+         */
+        @Bean(name = "transactionManager")
+        @Primary
+        @DependsOn({ "atomikosUserTransaction", "atomikosTransactionManager" })
+        public PlatformTransactionManager transactionManager() throws Throwable {
+            UserTransaction userTransaction = atomikosUserTransaction();
+            TransactionManager atomikosTransactionManager = atomikosTransactionManager();
+            JtaTransactionManager jtaTransactionManager = new JtaTransactionManager(userTransaction, atomikosTransactionManager);
+            jtaTransactionManager.setAllowCustomIsolationLevels(true);
+            return jtaTransactionManager;
+        }
+
+
+
+
+        /**
+         * 　DataSourceTransactionManager　事物  只会管理一个数据源的事物　当一个方法中实现了访问多个数据库无法进行多数据源的事物支持。
          *
          * @param dataSource
          * @return
          */
-        @Bean
+       /* @Bean
         @Primary
-        public PlatformTransactionManager transactionManager(DataSource dataSource) throws SQLException{
-            dataSource = dataSource();
+        public PlatformTransactionManager transactionManager(@Qualifier("dataSource") DataSource dataSource) throws Throwable{
             return new DataSourceTransactionManager(dataSource);
-        }
+        }*/
 
         /**
          * jpa 事物
@@ -216,9 +295,51 @@ public class DruidConfiguration {
          * @param entityManagerFactory
          * @return
          */
-        @Bean
-        public PlatformTransactionManager txManager(EntityManagerFactory entityManagerFactory) throws SQLException{
+        /*@Bean
+        public PlatformTransactionManager txManager(EntityManagerFactory entityManagerFactory) throws Throwable{
             return new JpaTransactionManager(entityManagerFactory);
+        }*/
+
+
+        /**
+         *   配置DruidDataSource
+         *
+         * @param url
+         * @param username
+         * @param password
+         * @return
+         */
+        private DataSource getDataSource(String url, String username, String password) {
+           // DruidDataSource dataSource = new DruidDataSource();
+            DruidXADataSource dataSource = new DruidXADataSource();
+            dataSource.setUrl(url);
+            dataSource.setUsername(username);
+            dataSource.setPassword(password);
+            dataSource.setDriverClassName(driverClassName);
+
+            //configuration
+            dataSource.setInitialSize(initialSize);
+            dataSource.setMinIdle(minIdle);
+            dataSource.setMaxActive(maxActive);
+            dataSource.setMaxWait(maxWait);
+            dataSource.setTimeBetweenEvictionRunsMillis(timeBetweenEvictionRunsMillis);
+            dataSource.setMinEvictableIdleTimeMillis(minEvictableIdleTimeMillis);
+            dataSource.setValidationQuery(validationQuery);
+            dataSource.setTestWhileIdle(testWhileIdle);
+            dataSource.setTestOnBorrow(testOnBorrow);
+            dataSource.setTestOnReturn(testOnReturn);
+            dataSource.setPoolPreparedStatements(poolPreparedStatements);
+            dataSource.setMaxPoolPreparedStatementPerConnectionSize(maxPoolPreparedStatementPerConnectionSize);
+            dataSource.setUseGlobalDataSourceStat(useGlobalDataSourceStat);
+            try {
+                dataSource.setFilters(filters);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                log.error("druid configuration initialization filter: " + e);
+            }
+            dataSource.setConnectionProperties(connectionProperties);
+
+            return dataSource;
         }
 
 
@@ -230,35 +351,113 @@ public class DruidConfiguration {
          * @param password
          * @return
          */
-        public DataSource getDataSource(String url, String username, String password) {
-            DruidDataSource datasource = new DruidDataSource();
-            datasource.setUrl(url);
-            datasource.setUsername(username);
-            datasource.setPassword(password);
-            datasource.setDriverClassName(driverClassName);
+        private DataSource getDataSource(String url, String username, String password, String resourceName) {
+            // DruidDataSource dataSource = new DruidDataSource();
+
+
+
+           /* DruidXADataSource dataSource = new DruidXADataSource();
+            dataSource.setUrl(url);
+            dataSource.setUsername(username);
+            dataSource.setPassword(password);
+            dataSource.setDriverClassName(driverClassName);
 
             //configuration
-            datasource.setInitialSize(initialSize);
-            datasource.setMinIdle(minIdle);
-            datasource.setMaxActive(maxActive);
-            datasource.setMaxWait(maxWait);
-            datasource.setTimeBetweenEvictionRunsMillis(timeBetweenEvictionRunsMillis);
-            datasource.setMinEvictableIdleTimeMillis(minEvictableIdleTimeMillis);
-            datasource.setValidationQuery(validationQuery);
-            datasource.setTestWhileIdle(testWhileIdle);
-            datasource.setTestOnBorrow(testOnBorrow);
-            datasource.setTestOnReturn(testOnReturn);
-            datasource.setPoolPreparedStatements(poolPreparedStatements);
-            datasource.setMaxPoolPreparedStatementPerConnectionSize(maxPoolPreparedStatementPerConnectionSize);
-            datasource.setUseGlobalDataSourceStat(useGlobalDataSourceStat);
+            dataSource.setInitialSize(initialSize);
+            dataSource.setMinIdle(minIdle);
+            dataSource.setMaxActive(maxActive);
+            dataSource.setMaxWait(maxWait);
+            dataSource.setTimeBetweenEvictionRunsMillis(timeBetweenEvictionRunsMillis);
+            dataSource.setMinEvictableIdleTimeMillis(minEvictableIdleTimeMillis);
+            dataSource.setValidationQuery(validationQuery);
+            dataSource.setTestWhileIdle(testWhileIdle);
+            dataSource.setTestOnBorrow(testOnBorrow);
+            dataSource.setTestOnReturn(testOnReturn);
+            dataSource.setPoolPreparedStatements(poolPreparedStatements);
+            dataSource.setMaxPoolPreparedStatementPerConnectionSize(maxPoolPreparedStatementPerConnectionSize);
+            dataSource.setUseGlobalDataSourceStat(useGlobalDataSourceStat);
             try {
-                datasource.setFilters(filters);
+                dataSource.setFilters(filters);
             } catch (SQLException e) {
                 e.printStackTrace();
                 log.error("druid configuration initialization filter: " + e);
             }
-            datasource.setConnectionProperties(connectionProperties);
-            return datasource;
+            dataSource.setConnectionProperties(connectionProperties);*/
+
+
+           // AtomikosDataSourceBean xaDataSource = new AtomikosDataSourceBean();
+            AtomikosNonXADataSourceBean xaDataSource = new AtomikosNonXADataSourceBean();
+            xaDataSource.setDriverClassName(driverClassName);
+            xaDataSource.setPassword(password);
+            xaDataSource.setUrl(url);
+            xaDataSource.setUser(username);
+         //   xaDataSource.setXaDataSource(dataSource);
+            //  UniqueResourceName 任意命名，但必须唯一
+            xaDataSource.setUniqueResourceName(resourceName);
+            xaDataSource.setTestQuery(validationQuery);
+         //   xaDataSource.setXaDataSourceClassName(type);
+            xaDataSource.setPoolSize(poolSize);
+            try {
+                xaDataSource.setLoginTimeout(60);  //设置登录超时时间最长为60s
+                xaDataSource.setBorrowConnectionTimeout(60);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+            return xaDataSource;
+        }
+
+
+        /**
+         *  AtomikosDataSource
+         * @param env
+         * @param resourceName
+         * @return
+         */
+        private DataSource atomikosDataSource(Environment env, String resourceName) {
+            AtomikosDataSourceBean dataSource = new AtomikosDataSourceBean();
+            Properties prop = build(env, "spring.datasource.");
+            dataSource.setXaDataSourceClassName("com.alibaba.druid.pool.xa.DruidXADataSource");
+            dataSource.setUniqueResourceName(resourceName);
+            dataSource.setPoolSize(5);
+            dataSource.setXaProperties(prop);
+            return dataSource;
+
+        }
+
+        /**
+         *
+         * @param env
+         * @param prefix
+         * @return
+         */
+        private Properties build(Environment env, String prefix) {
+            Properties prop = new Properties();
+            prop.put("url", env.getProperty(prefix + "url"));
+            prop.put("username", env.getProperty(prefix + "username"));
+            prop.put("password", env.getProperty(prefix + "password"));
+            prop.put("driverClassName", env.getProperty(prefix + "driverClassName", ""));
+            prop.put("initialSize", env.getProperty(prefix + "initialSize", Integer.class));
+            prop.put("maxActive", env.getProperty(prefix + "maxActive", Integer.class));
+            prop.put("minIdle", env.getProperty(prefix + "minIdle", Integer.class));
+            prop.put("maxWait", env.getProperty(prefix + "maxWait", Integer.class));
+            prop.put("poolPreparedStatements", env.getProperty(prefix + "poolPreparedStatements", Boolean.class));
+
+            prop.put("maxPoolPreparedStatementPerConnectionSize",
+                    env.getProperty(prefix + "maxPoolPreparedStatementPerConnectionSize", Integer.class));
+
+            prop.put("maxPoolPreparedStatementPerConnectionSize",
+                    env.getProperty(prefix + "maxPoolPreparedStatementPerConnectionSize", Integer.class));
+            prop.put("validationQuery", env.getProperty(prefix + "validationQuery"));
+            prop.put("validationQueryTimeout", env.getProperty(prefix + "validationQueryTimeout", Integer.class));
+            prop.put("testOnBorrow", env.getProperty(prefix + "testOnBorrow", Boolean.class));
+            prop.put("testOnReturn", env.getProperty(prefix + "testOnReturn", Boolean.class));
+            prop.put("testWhileIdle", env.getProperty(prefix + "testWhileIdle", Boolean.class));
+            prop.put("timeBetweenEvictionRunsMillis",
+                    env.getProperty(prefix + "timeBetweenEvictionRunsMillis", Integer.class));
+            prop.put("minEvictableIdleTimeMillis", env.getProperty(prefix + "minEvictableIdleTimeMillis", Integer.class));
+            prop.put("filters", env.getProperty(prefix + "filters"));
+
+            return prop;
         }
 
     }

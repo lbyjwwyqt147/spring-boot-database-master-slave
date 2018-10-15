@@ -84,7 +84,7 @@ public class UploadingRecordController  {
      * @return
      */
     @DeleteMapping(value = "/deletes/{id}")
-    public int delete(@PathVariable(value = "id") Long id) {
+    public int delete(@PathVariable(value = "id") Long id) throws Exception {
         return attachmentUploadingRecordService.delete(id);
 
     }
