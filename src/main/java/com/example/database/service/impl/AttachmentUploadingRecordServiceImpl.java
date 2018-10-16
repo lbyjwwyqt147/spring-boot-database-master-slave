@@ -38,7 +38,8 @@ public class AttachmentUploadingRecordServiceImpl implements AttachmentUploading
     private ApplicationContext applicationContext;
 
    // @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TargetDataSource(dataSource = DataSourceType.MASTER)
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
+   // @TargetDataSource(dataSource = DataSourceType.masterDataSource)
     @Override
     public Long insert(AttachmentUploadingRecord record) {
         Long fileId = 0L;

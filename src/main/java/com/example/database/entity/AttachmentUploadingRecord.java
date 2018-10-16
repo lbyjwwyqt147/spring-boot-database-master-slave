@@ -19,7 +19,9 @@ import java.util.Date;
  */
 @Entity
 @EntityListeners(AuditingEntityListener.class)
+@Table(name = "attachment_uploading_record")
 public class AttachmentUploadingRecord {
+
     /** id */
     private Long id;
 
@@ -102,6 +104,7 @@ public class AttachmentUploadingRecord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false)
     public Long getId() {
         return id;
     }
@@ -110,6 +113,7 @@ public class AttachmentUploadingRecord {
         this.id = id;
     }
 
+    @Column(name = "attachment_original_name", nullable = true, length = 255)
     public String getAttachmentOriginalName() {
         return attachmentOriginalName;
     }
@@ -118,6 +122,7 @@ public class AttachmentUploadingRecord {
         this.attachmentOriginalName = attachmentOriginalName == null ? null : attachmentOriginalName.trim();
     }
 
+    @Column(name = "attachment_name", nullable = true, length = 255)
     public String getAttachmentName() {
         return attachmentName;
     }
@@ -126,6 +131,7 @@ public class AttachmentUploadingRecord {
         this.attachmentName = attachmentName == null ? null : attachmentName.trim();
     }
 
+    @Column(name = "file_directory", nullable = true, length = 100)
     public String getFileDirectory() {
         return fileDirectory;
     }
@@ -134,6 +140,7 @@ public class AttachmentUploadingRecord {
         this.fileDirectory = fileDirectory == null ? null : fileDirectory.trim();
     }
 
+    @Column(name = "absolute_address", nullable = true, length = 100)
     public String getAbsoluteAddress() {
         return absoluteAddress;
     }
@@ -142,6 +149,7 @@ public class AttachmentUploadingRecord {
         this.absoluteAddress = absoluteAddress == null ? null : absoluteAddress.trim();
     }
 
+    @Column(name = "call_on_address", nullable = true, length = 400)
     public String getCallOnAddress() {
         return callOnAddress;
     }
@@ -150,6 +158,7 @@ public class AttachmentUploadingRecord {
         this.callOnAddress = callOnAddress == null ? null : callOnAddress.trim();
     }
 
+    @Column(name = "attachment_postfix", nullable = true, length = 10)
     public String getAttachmentPostfix() {
         return attachmentPostfix;
     }
@@ -158,6 +167,7 @@ public class AttachmentUploadingRecord {
         this.attachmentPostfix = attachmentPostfix == null ? null : attachmentPostfix.trim();
     }
 
+    @Column(name = "attachment_type", nullable = true)
     public Byte getAttachmentType() {
         return attachmentType;
     }
@@ -166,6 +176,7 @@ public class AttachmentUploadingRecord {
         this.attachmentType = attachmentType;
     }
 
+    @Column(name = "attachment_size", nullable = true, length = 20)
     public String getAttachmentSize() {
         return attachmentSize;
     }
@@ -174,6 +185,7 @@ public class AttachmentUploadingRecord {
         this.attachmentSize = attachmentSize;
     }
 
+    @Column(name = "system_code", nullable = true, length = 32)
     public String getSystemCode() {
         return systemCode;
     }
@@ -182,6 +194,7 @@ public class AttachmentUploadingRecord {
         this.systemCode = systemCode == null ? null : systemCode.trim();
     }
 
+    @Column(name = "business_code", nullable = true, length = 32)
     public String getBusinessCode() {
         return businessCode;
     }
@@ -190,6 +203,7 @@ public class AttachmentUploadingRecord {
         this.businessCode = businessCode == null ? null : businessCode.trim();
     }
 
+    @Column(name = "business_type", nullable = true, length = 32)
     public String getBusinessType() {
         return businessType;
     }
@@ -200,6 +214,7 @@ public class AttachmentUploadingRecord {
 
     @Temporal(TemporalType.TIMESTAMP)
     @CreatedDate
+    @Column(name = "create_time", nullable = true)
     public Date getCreateTime() {
         return createTime;
     }
@@ -208,6 +223,7 @@ public class AttachmentUploadingRecord {
         this.createTime = createTime;
     }
 
+    @Column(name = "description", nullable = true, length = 100)
     public String getDescription() {
         return description;
     }
@@ -216,6 +232,7 @@ public class AttachmentUploadingRecord {
         this.description = description == null ? null : description.trim();
     }
 
+    @Column(name = "attribute_one", nullable = true, length = 100)
     public String getAttributeOne() {
         return attributeOne;
     }
@@ -224,6 +241,7 @@ public class AttachmentUploadingRecord {
         this.attributeOne = attributeOne == null ? null : attributeOne.trim();
     }
 
+    @Column(name = "attribute_two", nullable = true, length = 100)
     public String getAttributeTwo() {
         return attributeTwo;
     }
@@ -232,6 +250,7 @@ public class AttachmentUploadingRecord {
         this.attributeTwo = attributeTwo == null ? null : attributeTwo.trim();
     }
 
+    @Column(name = "attribute_three", nullable = true, length = 100)
     public String getAttributeThree() {
         return attributeThree;
     }
@@ -240,6 +259,7 @@ public class AttachmentUploadingRecord {
         this.attributeThree = attributeThree == null ? null : attributeThree.trim();
     }
 
+    @Column(name = "attribute_four", nullable = true, length = 100)
     public String getAttributeFour() {
         return attributeFour;
     }
@@ -248,6 +268,7 @@ public class AttachmentUploadingRecord {
         this.attributeFour = attributeFour == null ? null : attributeFour.trim();
     }
 
+    @Column(name = "uploader_name", nullable = true, length = 50)
     public String getUploaderName() {
         return uploaderName;
     }
@@ -256,6 +277,7 @@ public class AttachmentUploadingRecord {
         this.uploaderName = uploaderName == null ? null : uploaderName.trim();
     }
 
+    @Column(name = "uploader_id", nullable = true, length = 50)
     public String getUploaderId() {
         return uploaderId;
     }

@@ -72,7 +72,7 @@ spring:
     show-sql: true
     database-platform: org.hibernate.dialect.MySQL5Dialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
       # update：表示自动根据model对象来更新表结构，启动 hibernate 时会自动检查数据库，如果缺少表则自动建表；缺少列则自动添加列；
       # create： 启动hibernate时，自动删除原来的表，新建所有的表，所以每次启动后的以前数据都会丢失。
       # create-drop：应用停下来的时候，自动会把表和数据删掉、
@@ -80,23 +80,73 @@ spring:
       # validate：会验证类里的属性和表字段是否一致，不一致，则会报错；
       naming:
         physical-strategy: org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy
+
+  #jta:
+    #transaction-manager-id: transactionManager
+    #bitronix:
+      #datasource:
+        #allow-local-transactions: true # 事务管理器是否应允许混合XA和非XA事务
+    #atomikos:
+      #datasource:
+        #borrow-connection-timeout: 30  #从池借用连接的超时（以秒为单位）
+        #max-idle-time: 60  #从池中清除连接的时间（以秒为单位）
+        #maintenance-interval: 60 # 池维护线程运行之间的时间（以秒为单位）
+        #reap-timeout: 20
+        #max-pool-size: 30
+      #properties:
+        #max-actives: 50
+        #max-timeout: 300000ms
+        #default-jta-timeout: 10000ms
+        #enable-logging: true
+
+
+
   jta:
+    enabled: true
+    service: com.atomikos.icatch.standalone.UserTransactionServiceFactory
+    max-actives: 200
+    enable-logging: false
     transaction-manager-id: transactionManager
     bitronix:
       datasource:
         allow-local-transactions: true # 事务管理器是否应允许混合XA和非XA事务
     atomikos:
       datasource:
-        borrow-connection-timeout: 30  #从池借用连接的超时（以秒为单位）
-        max-idle-time: 60  #从池中清除连接的时间（以秒为单位）
-        maintenance-interval: 60 # 池维护线程运行之间的时间（以秒为单位）
-        reap-timeout: 20
-        max-pool-size: 30
-      properties:
-        max-actives: 50
-        max-timeout: 300000ms
-        default-jta-timeout: 10000ms
-        enable-logging: true
+        one:
+          unique-resource-name: dataSourceOne
+          max-pool-size: 5
+          min-pool-size: 1
+          max-life-time: 20000
+          borrow-connection-timeout: 10000
+          xa-data-source-class-name: com.mysql.jdbc.jdbc2.optional.MysqlXADataSource
+          testQuery: SELECT 1 FROM DUAL
+          xa-properties:
+            user: root
+            password: root
+            URL: jdbc:mysql://10.130.0.37:3306/jwwl_attachment?useUnicode=true&characterEncoding=UTF-8&pinGlobalTxToPhysicalConnection=true
 
+        two:
+          unique-resource-name: dataSourceTwo
+          max-pool-size: 5
+          min-pool-size: 1
+          max-life-time: 20000
+          borrow-connection-timeout: 10000
+          xa-data-source-class-name: com.mysql.jdbc.jdbc2.optional.MysqlXADataSource
+          testQuery: SELECT 1 FROM DUAL
+          xa-properties:
+            user: root
+            password: 123456
+            URL: jdbc:mysql://10.130.0.37:3307/jwwl_attachment?useUnicode=true&characterEncoding=UTF-8&pinGlobalTxToPhysicalConnection=true
 
-
+        three:
+          unique-resource-name: dataSourceThree
+          max-pool-size: 5
+          min-pool-size: 1
+          max-life-time: 20000
+          borrow-connection-timeout: 10000
+          xa-data-source-class-name: com.mysql.jdbc.jdbc2.optional.MysqlXADataSource
+          testQuery: SELECT 1 FROM DUAL
+          xa-properties:
+            user: root
+            password: 123456
+            URL: jdbc:mysql://10.130.0.37:3307/jwwl_attachment?useUnicode=true&characterEncoding=UTF-8&pinGlobalTxToPhysicalConnection=true
