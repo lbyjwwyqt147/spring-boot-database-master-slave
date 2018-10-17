@@ -4,5 +4,19 @@
              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
              xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/persistence http://xmlns.jcp.org/xml/ns/persistence/persistence_2_1.xsd">
     <persistence-unit name="example-unit" transaction-type="RESOURCE_LOCAL">
+        <provider>org.hibernate.ejb.HibernatePersistence</provider>
+        <class>com.example.database.entity.AttachmentUploadingRecord</class>
+
+        <properties>
+            <property name="hibernate.transaction.flush_before_completion" value="true" />
+            <property name="hibernate.connection.release_mode" value="auto" />
+            <property name="hibernate.transaction.jta.platform" value="org.hibernate.service.jta.platform.internal.WebSphereExtendedJtaPlatform" />
+            <property name="hibernate.connection.autocommit" value="true" />
+          <!--  <property name="hibernate.transaction.manager_lookup_class" value="org.hibernate.transaction.JBossTransactionManagerLookup" />-->
+            <entry key="hibernate.transaction.manager_lookup_class" value="org.hibernate.transaction.WeblogicTransactionManagerLookup"/>
+            <property name="hibernate.transaction.factory_class" value="org.hibernate.ejb.transaction.JoinableCMTTransactionFactory" />
+            <property name="hibernate.current_session_context_class" value="org.hibernate.context.JTASessionContext"/>
+
+        </properties>
     </persistence-unit>
 </persistence>

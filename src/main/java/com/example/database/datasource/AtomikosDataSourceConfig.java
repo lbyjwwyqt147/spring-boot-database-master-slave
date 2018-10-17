@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.orm.jpa.JpaVendorAdapter;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.Database;
@@ -33,9 +34,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @EnableConfigurationProperties
 @EnableAutoConfiguration
 @EnableTransactionManagement(proxyTargetClass = true) //开启事务管理的注解
+@EnableJpaRepositories(
+        basePackages = "com.example.database.repository",
+        entityManagerFactoryRef = "entityManagerFactory",
+        transactionManagerRef = "transactionManager"
+)
 public class AtomikosDataSourceConfig {
 
-    @Bean
+    @Bean(name = "dataSourceOne")
     @ConfigurationProperties(prefix = "spring.jta.atomikos.datasource.one")
     public DataSource dataSourceOne() {
         return new AtomikosDataSourceBean();
@@ -84,32 +90,43 @@ public class AtomikosDataSourceConfig {
         return new MultipleDataSourceRouting(dataSourceOne(), targetDataSources);
     }
 
-    @Bean
+    @Bean(name = "entityManagerFactory")
     @Primary
     public LocalContainerEntityManagerFactoryBean entityManagerFactory() throws Throwable {
         LocalContainerEntityManagerFactoryBean entityManager = new LocalContainerEntityManagerFactoryBean();
        // entityManager.setDataSource(dataSource());
-        entityManager.setDataSource(dataSourceOne());
+        //entityManager.setDataSource(dataSourceOne());
+        entityManager.setJtaDataSource(dataSourceOne());
         entityManager.setJpaVendorAdapter(jpaVendorAdapter());
         entityManager.setPackagesToScan("com.example.database.entity");
-       // entityManager.setPersistenceUnitName("jpa");
+        entityManager.setPersistenceUnitName("example-unit");
         entityManager.setPersistenceXmlLocation("classpath:my-persistence.xml");
         entityManager.setPersistenceProviderClass(HibernatePersistenceProvider.class);
         Properties properties = new Properties();
         //jta设置
+       // properties.put("hibernate.transaction.factory_class", "org.hibernate.transaction.JTATransactionFactory");
+        properties.put("hibernate.transaction.factory_class", "org.hibernate.ejb.transaction.JoinableCMTTransactionFactory");
+       // properties.put("hibernate.transaction.manager_lookup_class", "com.atomikos.icatch.jta.hibernate3.TransactionManagerLookup");
+        properties.put("hibernate.transaction.manager_lookup_class", " org.hibernate.transaction.WeblogicTransactionManagerLookup");
+
         properties.put("hibernate.current_session_context_class", "jta");
-        properties.put("hibernate.transaction.factory_class", "org.hibernate.transaction.JTATransactionFactory");
-        properties.put("hibernate.transaction.manager_lookup_class", "com.atomikos.icatch.jta.hibernate3.TransactionManagerLookup");
+        properties.put("hibernate.transaction.flush_before_completion", "true");
+        properties.put("hibernate.connection.release_mode", "auto");
+       // properties.put("hibernate.transaction.jta.platform", "org.hibernate.service.jta.platform.internal.SunOneJtaPlatform");
+        properties.put("hibernate.transaction.jta.platform", "org.hibernate.service.jta.platform.internal.WebSphereExtendedJtaPlatform");
+        properties.put("hibernate.connection.autocommit", "true");
+        properties.put("hibernate.current_session_context_class", "org.hibernate.context.JTASessionContext");
         entityManager.setJpaProperties(properties);
         return entityManager;
     }
 
-    @Bean
+    @Bean(name = "jpaVendorAdapter")
     public JpaVendorAdapter jpaVendorAdapter() {
         HibernateJpaVendorAdapter hibernateJpaVendorAdapter = new HibernateJpaVendorAdapter();
         hibernateJpaVendorAdapter.setShowSql(true);
         hibernateJpaVendorAdapter.setGenerateDdl(true);
         hibernateJpaVendorAdapter.setDatabase(Database.MYSQL);
+        hibernateJpaVendorAdapter.setDatabasePlatform("org.hibernate.dialect.MySQLDialect");
         return hibernateJpaVendorAdapter;
     }
 
@@ -129,6 +146,7 @@ public class AtomikosDataSourceConfig {
     public UserTransactionManager atomikosTransactionManager() throws Throwable {
         UserTransactionManager userTransactionManager = new UserTransactionManager();
         userTransactionManager.setForceShutdown(true);
+
         return userTransactionManager;
     }
 

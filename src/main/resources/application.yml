@@ -18,14 +18,14 @@ spring:
       url: jdbc:mysql://10.130.0.37:3306/jwwl_attachment?useUnicode=true&characterEncoding=UTF-8&pinGlobalTxToPhysicalConnection=true
       #url: jdbc:log4jdbc:mysql://10.130.0.37:3306/jwwl_attachment?useUnicode=true&characterEncoding=utf8
       username: root
-      password: root
+      password: 123456
 
     # 从库2数据源
     slave2:
       url: jdbc:mysql://10.130.0.37:3306/jwwl_attachment?useUnicode=true&characterEncoding=UTF-8&pinGlobalTxToPhysicalConnection=true
       #url: jdbc:log4jdbc:mysql://10.130.0.37:3306/jwwl_attachment?useUnicode=true&characterEncoding=utf8
       username: root
-      password: root
+      password: 123456
 
     # 连接池的配置信息
     # 初始化大小，最小，最大
